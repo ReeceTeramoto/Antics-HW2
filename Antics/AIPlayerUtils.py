@@ -1,7 +1,7 @@
 import random
 from Constants import *
-from Ant import UNIT_STATS
-from Construction import CONSTR_STATS
+from Ant import *
+from Construction import *
 from Move import *
 
 #

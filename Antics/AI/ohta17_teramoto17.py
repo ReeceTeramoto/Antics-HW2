@@ -30,6 +30,43 @@ class AIPlayer(Player):
         super(AIPlayer,self).__init__(inputPlayerId, "Ohta_Teramoto AI")
     
     ##
+    #Node
+    #Description: Creates a class that will represent a node in the
+    #   search tree. The node references the parent node. A move that
+    #   can be taken from the parent node. The state of the game after
+    #   the move is finished. The value of the state that was just reached.
+    #
+    ##
+    class Node(object):
+        def __init__(self, newMove, newState, newParent, newVal):
+            self.move = newMove
+            self.state = newState
+            self.parent = newParent
+            self.val = newVal
+
+        def __str__(self):
+            return str(self.move)
+        
+    ##
+    #findOverallScore
+    #Description: called to evaluate the score of a list of nodes.
+    #
+    #Parameters:
+    #   nodeList - The list of nodes down a ceratin path
+    ##
+    def findOverallScore(nodeList):
+        #iterate through the list
+        #take the nodes value from getStateValue
+        #average the scores of all the nodes
+        total = 0
+        for node in nodeList:
+            sub = total
+            score = node.val
+            total = score + sub
+        avg = (total)/(len(nodeList))
+        return avg
+    
+    ##
     #getPlacement
     #
     #Description: called during setup phase for each Construction that

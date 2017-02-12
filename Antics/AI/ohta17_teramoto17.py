@@ -93,8 +93,6 @@ def getStateValue(self, currentState):
     queenHealthTotal = myQueenHealth + otherQueenHealth
     rtn += weight * queenHealthDiff / queenHealthTotal
 
-    print "queen health diff: " + str(queenHealthDiff)
-
     # get both players' anthills
     myAnthill = getConstrList(currentState, myId, [ANTHILL])[0]
     otherAnthill = getConstrList(currentState, otherId, [ANTHILL])[0]
@@ -110,20 +108,12 @@ def getStateValue(self, currentState):
     # anthill health difference changes the score of the state
     rtn += weight * anthillHealthDiff / anthillHealthTotal
 
-    print "my anthill health: " + str(myAnthill.captureHealth)
-    print "other anthill health: " + str(otherAnthill.captureHealth)
-    print "anthill health diff: " + str(anthillHealthDiff)
-
     # get the food difference
     myGameState = currentState.fastclone()
     myFood = myGameState.inventories[myId].foodCount
     otherFood = myGameState.inventories[otherId].foodCount
     foodDiff = myFood - otherFood
     foodTotal = myFood + otherFood
-
-    print "my food: " + str(myFood)
-    print "other food: " + str(otherFood)
-    print "food diff: " + str(foodDiff)
 
     # if one person has 11 food, that person wins
     if myFood == 11:
@@ -145,10 +135,6 @@ def getStateValue(self, currentState):
     antsFoodCostDiff = myAntsCost - otherAntsCost
     antsFoodCostTotal = myAntsCost + otherAntsCost
 
-    print "my ants cost: " + str(myAntsCost)
-    print "other ants cost: " + str(otherAntsCost)
-    print "ants food cost diff: " + str(antsFoodCostDiff)
-
     # the ants' food cost difference affects the score of the state
     if antsFoodCostTotal != 0:
         rtn += weight * antsFoodCostDiff / antsFoodCostTotal
@@ -156,7 +142,42 @@ def getStateValue(self, currentState):
     return rtn
 
 
+##
+#Node
+#Description: Creates a class that will represent a node in the
+#   search tree. The node references the parent node. A move that
+#   can be taken from the parent node. The state of the game after
+#   the move is finished. The value of the state that was just reached.
+#
+##
+class Node(object):
+    def __init__(self, newMove = None, newState = None, newParent = None, newVal = None):
+        self.move = newMove
+        self.state = newState
+        self.parent = newParent
+        self.val = newVal
 
+    def __str__(self):
+        return str(self.move)
+    
+##
+#findOverallScore
+#Description: called to evaluate the score of a list of nodes.
+#
+#Parameters:
+#   nodeList - The list of nodes down a ceratin path
+##
+def findOverallScore(nodeList):
+    #iterate through the list
+    #take the nodes value from getStateValue
+    #average the scores of all the nodes
+    total = 0
+    for node in nodeList:
+        sub = total
+        score = node.val
+        total = score + sub
+    avg = (total)/(len(nodeList))
+    return avg
 
 ##
 #AIPlayer
@@ -178,45 +199,62 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Ohta_Teramoto AI")
         
-    
-    
-    ##
-    #Node
-    #Description: Creates a class that will represent a node in the
-    #   search tree. The node references the parent node. A move that
-    #   can be taken from the parent node. The state of the game after
-    #   the move is finished. The value of the state that was just reached.
-    #
-    ##
-    class Node(object):
-        def __init__(self, newMove, newState, newParent, newVal):
-            self.move = newMove
-            self.state = newState
-            self.parent = newParent
-            self.val = newVal
 
-        def __str__(self):
-            return str(self.move)
-        
     ##
-    #findOverallScore
-    #Description: called to evaluate the score of a list of nodes.
+    #searchTree
+    #
+    #Description: Given a state and the current depth, get all possible moves and states that result
+    # from each move. Assess the overall value of each list of nodes.
     #
     #Parameters:
-    #   nodeList - The list of nodes down a ceratin path
+    #   state - a GameState object
+    #   depth - the current depth
+    #   depthLim - the depth limit that determines when we stop searching into the future
+    #   node - the current node being passed down
+    #
+    #Return: The overall value of the entire list of nodes
     ##
-    def findOverallScore(nodeList):
-        #iterate through the list
-        #take the nodes value from getStateValue
-        #average the scores of all the nodes
-        total = 0
-        for node in nodeList:
-            sub = total
-            score = node.val
-            total = score + sub
-        avg = (total)/(len(nodeList))
-        return avg
-    
+    def searchTree(self, state, depth, depthLim, node = None):
+        # generate a list of all possible moves that could be made from the given state
+        allMoves = listAllLegalMoves(state)
+
+        if node is None:
+            node = Node()
+
+        # discard the END_TURN move
+        endTurnMove = Move(END, None, None)
+        if endTurnMove in allMoves:
+            allMoves.remove(endTurnMove)
+
+        # generate a list of GameState objects that will result from making each move
+        allChildren = []
+        for move in allMoves:
+            newState = getNextState(state, move)
+            newStateVal = getStateValue(self, state)
+            newNode = Node(move, newState, node, newStateVal)
+            allChildren.append(newNode)
+
+        # recursive case: if the depth limit has not been reached, make a recursive
+        # call for each state in the list and use the result of the call as the new value
+        # for this node
+        if depth < depthLim:
+            for child in allChildren:
+                child.val = self.searchTree(child.state, depth + 1, depthLim)
+
+        # assess overall value of entire list of nodes
+        overallVal = findOverallScore(allChildren)
+        print "overall val: " + str(overallVal)
+
+        # return the overall value if depth > 0
+        if depth > 0:
+            return overallVal
+        # otherwise, return the Move object from the node that has the
+        # highest evaluation score
+        else:
+            allEvalScores = [child.val for child in allChildren]
+            idxOfHighestScore = allEvalScores.index(max(allEvalScores))
+            return allChildren[idxOfHighestScore].move
+        
     ##
     #getPlacement
     #
@@ -281,6 +319,10 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
+        
+        depthLim = 2
+        return self.searchTree(currentState, 0, depthLim)
+        '''
         moves = listAllLegalMoves(currentState)
         selectedMove = moves[random.randint(0,len(moves) - 1)];
 
@@ -292,6 +334,7 @@ class AIPlayer(Player):
             selectedMove = moves[random.randint(0,len(moves) - 1)];
             
         return selectedMove
+        '''
     
     ##
     #getAttack

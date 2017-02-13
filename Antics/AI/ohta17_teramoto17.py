@@ -8,6 +8,7 @@ from Ant import UNIT_STATS
 from Move import Move
 from GameState import *
 from AIPlayerUtils import *
+import time
 
 ##
 #getFoodCost
@@ -57,9 +58,10 @@ def getFoodCost(antList):
 #Return: The value of the state
 ##
 def getStateValue(self, currentState):
+
     # start off at an even state
     rtn = 0.5
-    weight = 0.125
+    weight = 0.5
 
     myId = self.playerId
     otherId = 0
@@ -75,6 +77,7 @@ def getStateValue(self, currentState):
     # multiplied by 0.125, then added to the rtn value.
     # Note that a negative difference will subtract.
 
+    '''
     # get both players' queens
     myInv = getCurrPlayerInventory(currentState)
     myQueen = myInv.getQueen()
@@ -107,24 +110,63 @@ def getStateValue(self, currentState):
 
     # anthill health difference changes the score of the state
     rtn += weight * anthillHealthDiff / anthillHealthTotal
-
+    '''
     # get the food difference
     myGameState = currentState.fastclone()
     myFood = myGameState.inventories[myId].foodCount
+
+    myWorkers = getAntList(currentState, myId, (WORKER,))
+    myWorkersFood = len([worker for worker in myWorkers if worker.carrying ])
+    myFood = myFood + (0.5) * myWorkersFood
+    
+    otherWorkers = getAntList(currentState, otherId, (WORKER,))
+    otherWorkersFood = len([worker for worker in otherWorkers if worker.carrying ])
+ 
     otherFood = myGameState.inventories[otherId].foodCount
+    otherFood = otherFood * (0.5) * otherWorkersFood
+
+    myFoodOnBoard = getConstrList(currentState, None, (FOOD,))
+    myTunnelAndAnthill = getConstrList(currentState, myId, (TUNNEL, ANTHILL))
+    foodDistVal = 0
+    for worker in myWorkers:
+        # works that are carrying food get more points if they move toward the anthill or tunnel
+        if worker.carrying:
+            nearestTunnelAnthill = 1000 #infinity
+            for construct in myTunnelAndAnthill:
+                newDist = stepsToReach(currentState, worker.coords, construct.coords)
+                if newDist < nearestTunnelAnthill:
+                    nearestTunnelAnthill = newDist
+            myFood += (nearestTunnelAnthill / 12)
+        # workers not carrying food are "rewarded" for moving towards food
+        else:
+            nearestFoodDist = 1000 # infinity
+            for food in myFoodOnBoard:
+                newDist = stepsToReach(currentState, worker.coords, food.coords)
+                if newDist < nearestFoodDist:
+                    nearestFoodDist = newDist
+            myFood += (nearestFoodDist / 12)
+            
+            
+            
+            
+    
     foodDiff = myFood - otherFood
     foodTotal = myFood + otherFood
 
     # if one person has 11 food, that person wins
-    if myFood == 11:
-        return 1
-    if otherFood == 11:
-        return 0
+    #if myFood == 11:
+    #    return 1
+    #if otherFood == 11:
+    #    return 0
 
     # the food difference affects the score of the state
     if foodTotal != 0:
-        rtn += weight * foodDiff / foodTotal
+        #print "my food in this state: " + str(myFood)
+        #print "return val is " + str(rtn)
+        rtn = myFood # + foodDistVal # (myFood / 11)  #foodDiff / foodTotal
 
+    
+    '''
     # get the food cost difference (food cost of all my ants)
     myAnts = getAntList(currentState, myId, [QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER])
     otherAnts = getAntList(currentState, otherId, [QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER])
@@ -138,7 +180,7 @@ def getStateValue(self, currentState):
     # the ants' food cost difference affects the score of the state
     if antsFoodCostTotal != 0:
         rtn += weight * antsFoodCostDiff / antsFoodCostTotal
-
+    '''
     return rtn
 
 
@@ -177,6 +219,9 @@ def findOverallScore(nodeList):
         score = node.val
         total = score + sub
     avg = (total)/(len(nodeList))
+
+    # return max instead
+    # return max([x.val for x in nodeList])
     return avg
 
 ##
@@ -234,16 +279,20 @@ class AIPlayer(Player):
             newNode = Node(move, newState, node, newStateVal)
             allChildren.append(newNode)
 
+        # assess overall value of entire list of nodes
+        overallVal = findOverallScore(allChildren)
+
         # recursive case: if the depth limit has not been reached, make a recursive
         # call for each state in the list and use the result of the call as the new value
         # for this node
         if depth < depthLim:
             for child in allChildren:
+                # only search the child if its value is greater than the average value
+
+                #if child.val > overallVal:
                 child.val = self.searchTree(child.state, depth + 1, depthLim)
 
-        # assess overall value of entire list of nodes
-        overallVal = findOverallScore(allChildren)
-        print "overall val: " + str(overallVal)
+
 
         # return the overall value if depth > 0
         if depth > 0:
@@ -253,6 +302,7 @@ class AIPlayer(Player):
         else:
             allEvalScores = [child.val for child in allChildren]
             idxOfHighestScore = allEvalScores.index(max(allEvalScores))
+            print "choosing path with eval score of " + str(max(allEvalScores))
             return allChildren[idxOfHighestScore].move
         
     ##

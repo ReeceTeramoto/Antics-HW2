@@ -201,6 +201,84 @@ def getStateValue(self, currentState):
     '''
     return rtn
 
+##
+#searchTree
+#
+#Description: Given a state and the current depth, get all possible moves and states that result
+# from each move. Assess the overall value of each list of nodes.
+#
+#Parameters:
+#   state - a GameState object
+#   depth - the current depth
+#   depthLim - the depth limit that determines when we stop searching into the future
+#   node - the current node being passed down
+#
+#Return: The overall value of the entire list of nodes
+##
+def searchTree(self, state, depth, depthLim, node = None):
+
+    #if depth == 0:
+        #print "calling searchTree with depth 0"
+    
+    # generate a list of all possible moves that could be made from the given state
+    allMoves = listAllLegalMoves(state)
+
+    if node is None:
+        node = Node()
+
+    # discard the END_TURN move
+    endTurnMove = Move(END, None, None)
+    if endTurnMove in allMoves:
+        allMoves.remove(endTurnMove)
+
+    # generate a list of GameState objects that will result from making each move
+    allChildren = []
+    for move in allMoves:
+        newState = getNextState(state, move)
+        newStateVal = getStateValue(self, state)
+        newNode = Node(move, newState, node, newStateVal)
+        allChildren.append(newNode)
+
+
+
+
+    # recursive case: if the depth limit has not been reached, make a recursive
+    # call for each state in the list and use the result of the call as the new value
+    # for this node
+    bestChildMove = None
+    if depth < depthLim:
+
+        bestSoFar = 0
+        
+        for child in allChildren:
+            # only search the child if its value is >= the best we've seen so far
+            #print "Depth " + str(depth) + ", move: " + str(child)
+            if child.val >= bestSoFar:
+
+                child.val = searchTree(self, child.state, depth + 1, depthLim, node)
+                #if child.val == 1.5:
+                #    print "Found child with val 1.5: " + str(child.move)
+            bestSoFar = child.val
+
+
+    # assess overall value of entire list of nodes
+    overallVal = findOverallScore(allChildren)
+    
+    #print "overall val at depth " + str(depth) + ": " + str(overallVal)
+    
+    # return the overall value if depth > 0
+    if depth > 0:
+        return overallVal
+    # otherwise, return the Move object from the node that has the
+    # highest evaluation score
+    if depth == 0:
+        allEvalScores = [child.val for child in allChildren]
+        idxOfHighestScore = allEvalScores.index(max(allEvalScores))
+        #print "choosing path with eval score of " + str(max(allEvalScores))
+        #print "choosing move: " + str(allChildren[idxOfHighestScore].move)
+        return allChildren[idxOfHighestScore].move
+        #return bestChildMove
+
 
 ##
 #Node
@@ -239,8 +317,8 @@ def findOverallScore(nodeList):
     avg = (total)/(len(nodeList))
 
     # return max instead
-    return max([x.val for x in nodeList])
-    #return avg
+    #return max([x.val for x in nodeList])
+    return avg
 
 ##
 #AIPlayer
@@ -263,77 +341,7 @@ class AIPlayer(Player):
         super(AIPlayer,self).__init__(inputPlayerId, "Ohta_Teramoto AI")
         
 
-    ##
-    #searchTree
-    #
-    #Description: Given a state and the current depth, get all possible moves and states that result
-    # from each move. Assess the overall value of each list of nodes.
-    #
-    #Parameters:
-    #   state - a GameState object
-    #   depth - the current depth
-    #   depthLim - the depth limit that determines when we stop searching into the future
-    #   node - the current node being passed down
-    #
-    #Return: The overall value of the entire list of nodes
-    ##
-    def searchTree(self, state, depth, depthLim, node = None):
 
-        print "calling searchTree with depth = " + str(depth)
-        
-        # generate a list of all possible moves that could be made from the given state
-        allMoves = listAllLegalMoves(state)
-
-        if node is None:
-            node = Node()
-
-        # discard the END_TURN move
-        endTurnMove = Move(END, None, None)
-        if endTurnMove in allMoves:
-            allMoves.remove(endTurnMove)
-
-        # generate a list of GameState objects that will result from making each move
-        allChildren = []
-        for move in allMoves:
-            newState = getNextState(state, move)
-            newStateVal = getStateValue(self, state)
-            newNode = Node(move, newState, node, newStateVal)
-            allChildren.append(newNode)
-
-
-
-
-        # recursive case: if the depth limit has not been reached, make a recursive
-        # call for each state in the list and use the result of the call as the new value
-        # for this node
-        bestChildMove = None
-        if depth < depthLim:
-
-            bestSoFar = 0
-            
-            for child in allChildren:
-                # only search the child if its value is >= the best we've seen so far
-
-                if child.val >= bestSoFar:
-                    child.val = self.searchTree(child.state, depth + 1, depthLim, node)
-                    bestSoFar = child.val
-
-
-        # assess overall value of entire list of nodes
-        overallVal = findOverallScore(allChildren)
-        #print "overall val at depth " + str(depth) + ": " + str(overallVal)
-        
-        # return the overall value if depth > 0
-        if depth > 0:
-            return overallVal
-        # otherwise, return the Move object from the node that has the
-        # highest evaluation score
-        if depth == 0:
-            allEvalScores = [child.val for child in allChildren]
-            idxOfHighestScore = allEvalScores.index(max(allEvalScores))
-            print "choosing path with eval score of " + str(max(allEvalScores))
-            return allChildren[idxOfHighestScore].move
-            #return bestChildMove
         
     ##
     #getPlacement
@@ -401,14 +409,16 @@ class AIPlayer(Player):
     def getMove(self, currentState):
 
         
+        
         depthLim = 2
-        return self.searchTree(currentState, 0, depthLim)
+        newMove = searchTree(self, currentState, 0, depthLim)
+        return newMove
         '''
         moves = listAllLegalMoves(currentState)
         
         selectedMove = moves[random.randint(0,len(moves) - 1)];
 
-        print "current game state value: " + str(getStateValue(self, currentState))
+        #print "current game state value: " + str(getStateValue(self, currentState))
 
         #don't do a build move if there are already 3+ ants
         numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
@@ -416,6 +426,7 @@ class AIPlayer(Player):
             selectedMove = moves[random.randint(0,len(moves) - 1)];
             
         return selectedMove
+
         '''
         
     

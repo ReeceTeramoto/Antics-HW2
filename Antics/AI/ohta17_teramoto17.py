@@ -125,6 +125,10 @@ def getStateValue(self, currentState):
             if (getConstrAt(currentState, worker.coords) == ANTHILL) or \
                (getConstrAt(currentState, worker.coords) == TUNNEL):
                 myFood += 0.5
+        # a worker without food on top of food adds points
+        else:
+            if (getConstrAt(currentState, worker.coords) == FOOD):
+                myFood += 0.5
     
     otherWorkers = getAntList(currentState, otherId, (WORKER,))
     otherWorkersFood = len([worker for worker in otherWorkers if worker.carrying ])
@@ -146,7 +150,7 @@ def getStateValue(self, currentState):
 
                 if newDist < nearestTunnelAnthill:
                     nearestTunnelAnthill = newDist
-            myFood += (nearestTunnelAnthill / 12)
+            myFood += ((12 - nearestTunnelAnthill) / 12)
         # workers not carrying food are "rewarded" for moving towards food
         else:
             nearestFoodDist = 1000 # infinity
@@ -158,9 +162,9 @@ def getStateValue(self, currentState):
                 if newDist < nearestFoodDist:
 
                     nearestFoodDist = newDist
-            myFood += (nearestFoodDist / 12)
-            
-     '''           
+            myFood += ((12 - nearestFoodDist) / 12)
+    '''
+               
             
             
     
@@ -274,6 +278,9 @@ class AIPlayer(Player):
     #Return: The overall value of the entire list of nodes
     ##
     def searchTree(self, state, depth, depthLim, node = None):
+
+        print "calling searchTree with depth = " + str(depth)
+        
         # generate a list of all possible moves that could be made from the given state
         allMoves = listAllLegalMoves(state)
 
@@ -293,31 +300,40 @@ class AIPlayer(Player):
             newNode = Node(move, newState, node, newStateVal)
             allChildren.append(newNode)
 
-        # assess overall value of entire list of nodes
-        overallVal = findOverallScore(allChildren)
+
+
 
         # recursive case: if the depth limit has not been reached, make a recursive
         # call for each state in the list and use the result of the call as the new value
         # for this node
+        bestChildMove = None
         if depth < depthLim:
+
+            bestSoFar = 0
+            
             for child in allChildren:
-                # only search the child if its value is greater than the average value
+                # only search the child if its value is >= the best we've seen so far
 
-                if child.val >= overallVal:
-                    child.val = self.searchTree(child.state, depth + 1, depthLim)
+                if child.val >= bestSoFar:
+                    child.val = self.searchTree(child.state, depth + 1, depthLim, node)
+                    bestSoFar = child.val
 
 
-
+        # assess overall value of entire list of nodes
+        overallVal = findOverallScore(allChildren)
+        #print "overall val at depth " + str(depth) + ": " + str(overallVal)
+        
         # return the overall value if depth > 0
         if depth > 0:
             return overallVal
         # otherwise, return the Move object from the node that has the
         # highest evaluation score
-        else:
+        if depth == 0:
             allEvalScores = [child.val for child in allChildren]
             idxOfHighestScore = allEvalScores.index(max(allEvalScores))
             print "choosing path with eval score of " + str(max(allEvalScores))
             return allChildren[idxOfHighestScore].move
+            #return bestChildMove
         
     ##
     #getPlacement

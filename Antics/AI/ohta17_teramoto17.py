@@ -60,7 +60,7 @@ def getFoodCost(antList):
 def getStateValue(self, currentState):
 
     # start off at an even state
-    rtn = 0.5
+    rtn = 0.0
     weight = 0.5
 
     myId = self.playerId
@@ -118,6 +118,13 @@ def getStateValue(self, currentState):
     myWorkers = getAntList(currentState, myId, (WORKER,))
     myWorkersFood = len([worker for worker in myWorkers if worker.carrying ])
     myFood = myFood + (0.5) * myWorkersFood
+
+    # a worker with food on top of an anthill or tunnel adds points
+    for worker in myWorkers:
+        if worker.carrying:
+            if (getConstrAt(currentState, worker.coords) == ANTHILL) or \
+               (getConstrAt(currentState, worker.coords) == TUNNEL):
+                myFood += 0.5
     
     otherWorkers = getAntList(currentState, otherId, (WORKER,))
     otherWorkersFood = len([worker for worker in otherWorkers if worker.carrying ])
@@ -128,25 +135,32 @@ def getStateValue(self, currentState):
     myFoodOnBoard = getConstrList(currentState, None, (FOOD,))
     myTunnelAndAnthill = getConstrList(currentState, myId, (TUNNEL, ANTHILL))
     foodDistVal = 0
+
+    '''
     for worker in myWorkers:
         # works that are carrying food get more points if they move toward the anthill or tunnel
         if worker.carrying:
             nearestTunnelAnthill = 1000 #infinity
             for construct in myTunnelAndAnthill:
-                newDist = stepsToReach(currentState, worker.coords, construct.coords)
+                newDist = stepsToReach(currentState, worker.coords, construct.coords)
+
                 if newDist < nearestTunnelAnthill:
                     nearestTunnelAnthill = newDist
             myFood += (nearestTunnelAnthill / 12)
         # workers not carrying food are "rewarded" for moving towards food
         else:
-            nearestFoodDist = 1000 # infinity
-            for food in myFoodOnBoard:
-                newDist = stepsToReach(currentState, worker.coords, food.coords)
-                if newDist < nearestFoodDist:
+            nearestFoodDist = 1000 # infinity
+
+            for food in myFoodOnBoard:
+
+                newDist = stepsToReach(currentState, worker.coords, food.coords)
+
+                if newDist < nearestFoodDist:
+
                     nearestFoodDist = newDist
             myFood += (nearestFoodDist / 12)
             
-            
+     '''           
             
             
     
@@ -221,8 +235,8 @@ def findOverallScore(nodeList):
     avg = (total)/(len(nodeList))
 
     # return max instead
-    # return max([x.val for x in nodeList])
-    return avg
+    return max([x.val for x in nodeList])
+    #return avg
 
 ##
 #AIPlayer
@@ -289,8 +303,8 @@ class AIPlayer(Player):
             for child in allChildren:
                 # only search the child if its value is greater than the average value
 
-                #if child.val > overallVal:
-                child.val = self.searchTree(child.state, depth + 1, depthLim)
+                if child.val >= overallVal:
+                    child.val = self.searchTree(child.state, depth + 1, depthLim)
 
 
 
@@ -369,11 +383,13 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
+
         
         depthLim = 2
         return self.searchTree(currentState, 0, depthLim)
         '''
         moves = listAllLegalMoves(currentState)
+        
         selectedMove = moves[random.randint(0,len(moves) - 1)];
 
         print "current game state value: " + str(getStateValue(self, currentState))
@@ -385,6 +401,7 @@ class AIPlayer(Player):
             
         return selectedMove
         '''
+        
     
     ##
     #getAttack

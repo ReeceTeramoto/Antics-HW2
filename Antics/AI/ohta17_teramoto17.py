@@ -4,7 +4,7 @@ sys.path.append("..")  #so other modules can be found in parent dir
 from Player import *
 from Constants import *
 from Construction import CONSTR_STATS
-from Ant import UNIT_STATS
+from Ant import *
 from Move import Move
 from GameState import *
 from AIPlayerUtils import *

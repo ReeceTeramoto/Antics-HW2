@@ -62,6 +62,8 @@ def getStateValue(self, currentState):
     # start off at an even state
     rtn = 0.0
     weight = 0.5
+    foodInvWeight = 24
+    heldFoodWeight = 12
 
     myId = self.playerId
     otherId = 0
@@ -77,129 +79,58 @@ def getStateValue(self, currentState):
     # multiplied by 0.125, then added to the rtn value.
     # Note that a negative difference will subtract.
 
-    '''
-    # get both players' queens
-    myInv = getCurrPlayerInventory(currentState)
-    myQueen = myInv.getQueen()
-    myQueenHealth = myQueen.health
-    otherQueen= getAntList(currentState, otherId, [QUEEN])[0]
-    otherQueenHealth = otherQueen.health
-
-    # if one queen is dead, that player loses
-    if myQueenHealth == 0:
-        return 0
-    if otherQueenHealth == 0:
-        return 1
-
-    # from the queen health difference, change the score of the state
-    queenHealthDiff = myQueenHealth - otherQueenHealth
-    queenHealthTotal = myQueenHealth + otherQueenHealth
-    rtn += weight * queenHealthDiff / queenHealthTotal
-
-    # get both players' anthills
-    myAnthill = getConstrList(currentState, myId, [ANTHILL])[0]
-    otherAnthill = getConstrList(currentState, otherId, [ANTHILL])[0]
-    anthillHealthDiff = myAnthill.captureHealth - otherAnthill.captureHealth
-    anthillHealthTotal = myAnthill.captureHealth + otherAnthill.captureHealth
-
-    # if one anthill is dead, that player loses
-    if myAnthill.captureHealth == 0:
-        return 0
-    if otherAnthill.captureHealth == 0:
-        return 1
-
-    # anthill health difference changes the score of the state
-    rtn += weight * anthillHealthDiff / anthillHealthTotal
-    '''
     # get the food difference
     myGameState = currentState.fastclone()
-    myFood = myGameState.inventories[myId].foodCount
-
+    
+    myFood = myGameState.inventories[myId].foodCount * 24
     myWorkers = getAntList(currentState, myId, (WORKER,))
-    myWorkersFood = len([worker for worker in myWorkers if worker.carrying ])
-    myFood = myFood + (0.5) * myWorkersFood
 
-    # a worker with food on top of an anthill or tunnel adds points
-    for worker in myWorkers:
-        if worker.carrying:
-            if (getConstrAt(currentState, worker.coords) == ANTHILL) or \
-               (getConstrAt(currentState, worker.coords) == TUNNEL):
-                myFood += 0.5
-        # a worker without food on top of food adds points
-        else:
-            if (getConstrAt(currentState, worker.coords) == FOOD):
-                myFood += 0.5
     
     otherWorkers = getAntList(currentState, otherId, (WORKER,))
-    otherWorkersFood = len([worker for worker in otherWorkers if worker.carrying ])
- 
     otherFood = myGameState.inventories[otherId].foodCount
-    otherFood = otherFood * (0.5) * otherWorkersFood
 
     myFoodOnBoard = getConstrList(currentState, None, (FOOD,))
+    myFoodOnBoard = [x for x in myFoodOnBoard if x.coords[1] <= 3]
+
     myTunnelAndAnthill = getConstrList(currentState, myId, (TUNNEL, ANTHILL))
-    foodDistVal = 0
-
-    '''
+    
     for worker in myWorkers:
-        # works that are carrying food get more points if they move toward the anthill or tunnel
-        if worker.carrying:
-            nearestTunnelAnthill = 1000 #infinity
-            for construct in myTunnelAndAnthill:
-                newDist = stepsToReach(currentState, worker.coords, construct.coords)
+        if not worker.carrying:
+            distances = []
+            # don't look at food that's covered
+            applicableFood = [food for food in myFoodOnBoard if (getAntAt(currentState, food.coords) is None)]
+            for food in applicableFood:
+                distances.append(approxDist(worker.coords, food.coords))
 
-                if newDist < nearestTunnelAnthill:
-                    nearestTunnelAnthill = newDist
-            myFood += ((12 - nearestTunnelAnthill) / 12)
-        # workers not carrying food are "rewarded" for moving towards food
-        else:
-            nearestFoodDist = 1000 # infinity
+            factor = 12
+            if distances:
+                factor = min(distances)
+            #print "worker is " + str(min(distances)) + " from anthill"
+            #print "factor is : " + str(factor)
+            #print "distances is : " + str(distances)
+            myFood += (12 - factor)
 
-            for food in myFoodOnBoard:
 
-                newDist = stepsToReach(currentState, worker.coords, food.coords)
+        else: # worker is carrying food 
+            distances = []
+            # don't look at anthill/tunnels that are covered
+            applicableTunnelHills = [construct for construct in myTunnelAndAnthill if \
+                                     (getAntAt(currentState, construct.coords) is None)]
+            for construct in applicableTunnelHills:
+                distances.append(approxDist(worker.coords, construct.coords))
 
-                if newDist < nearestFoodDist:
+            # if both anthill and tunnel are covered, skip
+            factor = 12
+            if distances:
+                factor = min(distances)
+            #print "worker is " + str(min(distances)) + " from food"
+            #print "factor is : " + str(factor)
+            #print "distances is : " + str(distances)
+            myFood += (12 - factor)    
 
-                    nearestFoodDist = newDist
-            myFood += ((12 - nearestFoodDist) / 12)
-    '''
-               
+            myFood += heldFoodWeight
             
-            
-    
-    foodDiff = myFood - otherFood
-    foodTotal = myFood + otherFood
-
-    # if one person has 11 food, that person wins
-    #if myFood == 11:
-    #    return 1
-    #if otherFood == 11:
-    #    return 0
-
-    # the food difference affects the score of the state
-    if foodTotal != 0:
-        #print "my food in this state: " + str(myFood)
-        #print "return val is " + str(rtn)
-        rtn = myFood # + foodDistVal # (myFood / 11)  #foodDiff / foodTotal
-
-    
-    '''
-    # get the food cost difference (food cost of all my ants)
-    myAnts = getAntList(currentState, myId, [QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER])
-    otherAnts = getAntList(currentState, otherId, [QUEEN, WORKER, DRONE, SOLDIER, R_SOLDIER])
-
-    # find the total food cost of my ants (queens don't count)
-    myAntsCost = getFoodCost(myAnts)
-    otherAntsCost= getFoodCost(otherAnts)
-    antsFoodCostDiff = myAntsCost - otherAntsCost
-    antsFoodCostTotal = myAntsCost + otherAntsCost
-
-    # the ants' food cost difference affects the score of the state
-    if antsFoodCostTotal != 0:
-        rtn += weight * antsFoodCostDiff / antsFoodCostTotal
-    '''
-    return rtn
+    return myFood
 
 ##
 #searchTree
@@ -217,11 +148,21 @@ def getStateValue(self, currentState):
 ##
 def searchTree(self, state, depth, depthLim, node = None):
 
+    print "state.inventories: " + str(state.inventories)
+    print "state.phase: " + str(state.phase)
+    print "state.whoseTurn: " + str(state.whoseTurn)
+    
+    
     #if depth == 0:
         #print "calling searchTree with depth 0"
     
     # generate a list of all possible moves that could be made from the given state
     allMoves = listAllLegalMoves(state)
+
+    # ignore moves that involve the queen
+    queenCoord = getAntList(state, self.playerId, (QUEEN,))[0].coords
+    print "queen coord: " + str(queenCoord)
+    allMoves = [x for x in allMoves if (x.moveType == MOVE_ANT and (queenCoord not in x.coordList))]
 
     if node is None:
         node = Node()
@@ -235,22 +176,35 @@ def searchTree(self, state, depth, depthLim, node = None):
     allChildren = []
     for move in allMoves:
         newState = getNextState(state, move)
-        newStateVal = getStateValue(self, state)
+        newStateVal = getStateValue(self, newState)
         newNode = Node(move, newState, node, newStateVal)
         allChildren.append(newNode)
 
 
+    # sort children by value
+    allChildren.sort(key=lambda x: x.val, reverse=True)
+    # get just the ones with the highest value
+    #if len(allChildren) != 0:
+    #    maxVal = max([x.val for x in allChildren])
+    #    allChildren = [x for x in allChildren if x.val == maxVal]
+    # shuffle the list
+    #random.shuffle(allChildren)
 
+    print "children: "
+    for child in allChildren:
+        print str(child.move.coordList) + " score: " + str(child.val)
+    
 
     # recursive case: if the depth limit has not been reached, make a recursive
     # call for each state in the list and use the result of the call as the new value
     # for this node
-    bestChildMove = None
     if depth < depthLim:
 
         bestSoFar = 0
+
+        childLim = int((len(allChildren)))
         
-        for child in allChildren:
+        for child in allChildren[:(childLim/3)]:
             # only search the child if its value is >= the best we've seen so far
             #print "Depth " + str(depth) + ", move: " + str(child)
             if child.val >= bestSoFar:
@@ -272,11 +226,18 @@ def searchTree(self, state, depth, depthLim, node = None):
     # otherwise, return the Move object from the node that has the
     # highest evaluation score
     if depth == 0:
-        allEvalScores = [child.val for child in allChildren]
-        idxOfHighestScore = allEvalScores.index(max(allEvalScores))
-        #print "choosing path with eval score of " + str(max(allEvalScores))
-        #print "choosing move: " + str(allChildren[idxOfHighestScore].move)
-        return allChildren[idxOfHighestScore].move
+        if len(allChildren) == 0:
+            return endTurnMove
+        highestEvalScore = max([child.val for child in allChildren])
+        childrenWithHighestScore = [child for child in allChildren if (child.val == highestEvalScore)]
+        random.shuffle(childrenWithHighestScore)
+        
+        #if len(allEvalScores) == 0:
+        #    return endTurnMove
+
+        print "choosing path with eval score of " + str(highestEvalScore)
+        print "choosing move: " + str(childrenWithHighestScore[0].move)
+        return childrenWithHighestScore[0].move
         #return bestChildMove
 
 
@@ -306,6 +267,10 @@ class Node(object):
 #   nodeList - The list of nodes down a ceratin path
 ##
 def findOverallScore(nodeList):
+
+    if len(nodeList) == 0:
+        return 0
+    
     #iterate through the list
     #take the nodes value from getStateValue
     #average the scores of all the nodes
@@ -317,8 +282,8 @@ def findOverallScore(nodeList):
     avg = (total)/(len(nodeList))
 
     # return max instead
-    #return max([x.val for x in nodeList])
-    return avg
+    return max([x.val for x in nodeList])
+    #return avg
 
 ##
 #AIPlayer
@@ -418,7 +383,7 @@ class AIPlayer(Player):
         
         selectedMove = moves[random.randint(0,len(moves) - 1)];
 
-        #print "current game state value: " + str(getStateValue(self, currentState))
+        print "current game state value: " + str(getStateValue(self, currentState))
 
         #don't do a build move if there are already 3+ ants
         numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
@@ -426,8 +391,9 @@ class AIPlayer(Player):
             selectedMove = moves[random.randint(0,len(moves) - 1)];
             
         return selectedMove
-
         '''
+
+        
         
     
     ##

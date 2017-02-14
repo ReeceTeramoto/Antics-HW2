@@ -360,6 +360,7 @@ class AIPlayer(Player):
     def getAttack(self, currentState, attackingAnt, enemyLocations):
         #Attack a random enemy.
         return enemyLocations[random.randint(0, len(enemyLocations) - 1)]
+
     
 #Unittesting
 
@@ -389,3 +390,38 @@ node2 = Node(0,0,0,0.7)
 nodeList = (node1, node2)
 if(findOverallScore(nodeList) != 0.6):
     print("findOverallScore does not work")    
+
+
+# unit test for getStateValue
+
+#Player IDs
+player0 = AIPlayer(0)
+player1 = AIPlayer(1)
+#creation of ants
+ant1 = Ant((0,1), WORKER, player0)
+ant2 = Ant((0,0), QUEEN, player0)
+ant3 = Ant((0,8), WORKER, player1)
+ant4 = Ant((0,9), QUEEN, player1)
+#creation of constructs
+con1 = Construction((0,2), ANTHILL)
+con2 = Construction((0,7), ANTHILL)
+con3 = Construction((1,0), TUNNEL)
+con4 = Construction((1,9), TUNNEL)
+con5 = Construction((2,0), FOOD)
+con6 = Construction((2,9), FOOD)
+#Creation of a Move
+testMove = Move(MOVE_ANT, (1,0), 2)
+#3 inventories needed for a game state
+testInv = Inventory(player0, [ant2], [con1,con3,con5], 10)
+testInv2 = Inventory(player1, [ant3, ant4], [con2,con4,con6], 0)
+testInv3 = Inventory(player0,[ant1, ant2, ant3, ant4], [con1,con2,con3,con4,con5,con6],0)
+testInv4 = Inventory(player0, [ant1, ant2], [con1,con3,con5], 1)
+#game states
+state1 = GameState(0, (testInv, testInv2, testInv3), 3, player0)
+state1Val = getStateValue(player0, state1)
+# player 1 has 10 food and no workers
+# (10 * 24) / 264 = 0.9090
+print "State value of 10 food no workers: " + str(getStateValue(player0, state1))
+print "Expected state value: " + str( (10 * 24) / float(264) )
+
+

@@ -349,9 +349,25 @@ class AIPlayer(Player):
         #Attack a random enemy.
         return enemyLocations[random.randint(0, len(enemyLocations) - 1)]
     
-#Tests to see if getFoodCost gives a value for an empty antList
-antList = []
-if(getFoodCost(antList) != 0):
+#Unittesting
+
+#Player IDs
+testID = AIPlayer(1)
+testID2 = AIPlayer(0)
+#creation of certain ants
+ant1 = Ant((0,0), WORKER, testID)
+ant2 = Ant((0,1), QUEEN, testID)
+ant3 = Ant((0,9), WORKER, testID2)
+ant4 = Ant((0,8), QUEEN, testID2)
+#3 inventories needed for a game state
+testInv = Inventory(testID, [ant1, ant2], 0, 0)
+testInv2 = Inventory(testID2, [ant3, ant4], 0, 0)
+testInv3 = Inventory(0,0,0,0)
+#game states
+state1 = GameState(0, (testInv, testInv2, testInv3), 0, testID)
+#Tests to see if getFoodCost gives a value of 1 for a worker ant
+antList = getAntList(state1, testID, [WORKER])
+if(getFoodCost(antList) != 1):
     print("getFoodCost is not working")
     
 

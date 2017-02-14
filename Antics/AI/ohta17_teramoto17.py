@@ -46,54 +46,34 @@ def getFoodCost(antList):
     return cost
 
 ##
-#getStateValue
+#getFoodPoints
 #
-#Description: Given a state, determines a double value between 0.0 and 1.0.
-#   Less than 0.5 means the agent is losing, greater than 0.5 means the
-#   agent is winning. 0.5 means that nobody is winning or losing.
+#Description: Given a state and an ID, award points based on
+# position of workers and current food 
 #
 #Parameters:
-#   state - the state of the game
+#   currentState - the state of the game
+#   myId - the player whose points we are calculating
 #
-#Return: The value of the state
+#Return: foodPoints - the points awarded to the player
 ##
-def getStateValue(self, currentState):
-
-    # start off at an even state
-    rtn = 0.0
-    weight = 0.5
+def getFoodPoints(self, currentState, myId):    
+    # Idea: 24 points are given for each food in inventory
+    # 12 points are given for each food held by an ant
+    myFoodPoints = 0
     foodInvWeight = 24
     heldFoodWeight = 12
 
-    myId = self.playerId
-    otherId = 0
-    if myId == 1:
-        otherId = 0
-    if myId == 0:
-        otherId = 1
-    
-    # Idea: find the differences in queen health, anthill health, food,
-    # and antFoodCost (cost of food used to produce all of the ants
-    # on a player's side.
-    # Each of these is divided by the total to get a fraction,
-    # multiplied by 0.125, then added to the rtn value.
-    # Note that a negative difference will subtract.
-
-    # get the food difference
     myGameState = currentState.fastclone()
-    
-    myFood = myGameState.inventories[myId].foodCount * 24
+
+    # get values for the workers and constructs that I need to calc points
+    myFoodPoints = myGameState.inventories[myId].foodCount * 24
     myWorkers = getAntList(currentState, myId, (WORKER,))
-
-    
-    otherWorkers = getAntList(currentState, otherId, (WORKER,))
-    otherFood = myGameState.inventories[otherId].foodCount
-
     myFoodOnBoard = getConstrList(currentState, None, (FOOD,))
     myFoodOnBoard = [x for x in myFoodOnBoard if x.coords[1] <= 3]
-
     myTunnelAndAnthill = getConstrList(currentState, myId, (TUNNEL, ANTHILL))
-    
+
+    # give points based on worker position and whether they are holding food
     for worker in myWorkers:
         if not worker.carrying:
             distances = []
@@ -105,10 +85,7 @@ def getStateValue(self, currentState):
             factor = 12
             if distances:
                 factor = min(distances)
-            #print "worker is " + str(min(distances)) + " from anthill"
-            #print "factor is : " + str(factor)
-            #print "distances is : " + str(distances)
-            myFood += (12 - factor)
+            myFoodPoints += (12 - factor)
 
 
         else: # worker is carrying food 
@@ -123,14 +100,49 @@ def getStateValue(self, currentState):
             factor = 12
             if distances:
                 factor = min(distances)
-            #print "worker is " + str(min(distances)) + " from food"
-            #print "factor is : " + str(factor)
-            #print "distances is : " + str(distances)
-            myFood += (12 - factor)    
-
-            myFood += heldFoodWeight
+            myFoodPoints += (12 - factor)    
+            myFoodPoints += heldFoodWeight
             
-    return myFood
+    return myFoodPoints
+
+##
+#getStateValue
+#
+#Description: Given a state, determines a double value between 0.0 and 1.0.
+#   Less than 0.5 means the agent is losing, greater than 0.5 means the
+#   agent is winning. 0.5 means that nobody is winning or losing.
+#
+#Parameters:
+#   state - the state of the game
+#
+#Return: The value of the state
+##
+def getStateValue(self, currentState):
+
+    # get player IDs
+    myId = self.playerId
+    otherId = 0
+    if myId == 1:
+        otherId = 0
+    if myId == 0:
+        otherId = 1
+
+    # get points for each player
+    myPoints = getFoodPoints(self, currentState, myId)
+    otherPoints = getFoodPoints(self, currentState, otherId)
+    #otherPoints = currentState.inventories[otherId].foodCount
+    myFoodCount = currentState.inventories[myId].foodCount
+    otherFoodCount = currentState.inventories[otherId].foodCount
+    totalPoints = myPoints + otherPoints
+
+    # handle win/lose conditions
+    if myFoodCount == 11:
+        return 1
+    if otherFoodCount == 11:
+        return 0
+    # scale the point values
+    maxPoints = 264 # possible points for having 11 food
+    return (myPoints / float(maxPoints))
 
 ##
 #searchTree
@@ -147,21 +159,11 @@ def getStateValue(self, currentState):
 #Return: The overall value of the entire list of nodes
 ##
 def searchTree(self, state, depth, depthLim, node = None):
-
-    print "state.inventories: " + str(state.inventories)
-    print "state.phase: " + str(state.phase)
-    print "state.whoseTurn: " + str(state.whoseTurn)
-    
-    
-    #if depth == 0:
-        #print "calling searchTree with depth 0"
-    
     # generate a list of all possible moves that could be made from the given state
     allMoves = listAllLegalMoves(state)
 
     # ignore moves that involve the queen
     queenCoord = getAntList(state, self.playerId, (QUEEN,))[0].coords
-    print "queen coord: " + str(queenCoord)
     allMoves = [x for x in allMoves if (x.moveType == MOVE_ANT and (queenCoord not in x.coordList))]
 
     if node is None:
@@ -180,39 +182,18 @@ def searchTree(self, state, depth, depthLim, node = None):
         newNode = Node(move, newState, node, newStateVal)
         allChildren.append(newNode)
 
-
     # sort children by value
     allChildren.sort(key=lambda x: x.val, reverse=True)
-    # get just the ones with the highest value
-    #if len(allChildren) != 0:
-    #    maxVal = max([x.val for x in allChildren])
-    #    allChildren = [x for x in allChildren if x.val == maxVal]
-    # shuffle the list
-    #random.shuffle(allChildren)
-
-    print "children: "
-    for child in allChildren:
-        print str(child.move.coordList) + " score: " + str(child.val)
-    
 
     # recursive case: if the depth limit has not been reached, make a recursive
     # call for each state in the list and use the result of the call as the new value
     # for this node
     if depth < depthLim:
-
-        bestSoFar = 0
-
-        childLim = int((len(allChildren)))
+        # search the first 1/3 of children
+        childLim = len(allChildren) / 3
         
-        for child in allChildren[:(childLim/3)]:
-            # only search the child if its value is >= the best we've seen so far
-            #print "Depth " + str(depth) + ", move: " + str(child)
-            if child.val >= bestSoFar:
-
-                child.val = searchTree(self, child.state, depth + 1, depthLim, node)
-                #if child.val == 1.5:
-                #    print "Found child with val 1.5: " + str(child.move)
-            bestSoFar = child.val
+        for child in allChildren[:childLim]:
+            child.val = searchTree(self, child.state, depth + 1, depthLim, node)
 
 
     # assess overall value of entire list of nodes
@@ -230,16 +211,9 @@ def searchTree(self, state, depth, depthLim, node = None):
             return endTurnMove
         highestEvalScore = max([child.val for child in allChildren])
         childrenWithHighestScore = [child for child in allChildren if (child.val == highestEvalScore)]
+        # shuffle all ties for highest score
         random.shuffle(childrenWithHighestScore)
-        
-        #if len(allEvalScores) == 0:
-        #    return endTurnMove
-
-        print "choosing path with eval score of " + str(highestEvalScore)
-        print "choosing move: " + str(childrenWithHighestScore[0].move)
         return childrenWithHighestScore[0].move
-        #return bestChildMove
-
 
 ##
 #Node
@@ -305,9 +279,6 @@ class AIPlayer(Player):
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, "Ohta_Teramoto AI")
         
-
-
-        
     ##
     #getPlacement
     #
@@ -364,7 +335,7 @@ class AIPlayer(Player):
     
     ##
     #getMove
-    #Description: Gets the next move from the Player.
+    #Description: Gets the next move from the Player. Searches with a depth limit.
     #
     #Parameters:
     #   currentState - The state of the current game waiting for the player's move (GameState)
@@ -372,29 +343,10 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
-
-        
-        
-        depthLim = 2
+       
+        depthLim = 2 # search 2 nodes deep in recursive function
         newMove = searchTree(self, currentState, 0, depthLim)
         return newMove
-        '''
-        moves = listAllLegalMoves(currentState)
-        
-        selectedMove = moves[random.randint(0,len(moves) - 1)];
-
-        print "current game state value: " + str(getStateValue(self, currentState))
-
-        #don't do a build move if there are already 3+ ants
-        numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
-        while (selectedMove.moveType == BUILD and numAnts >= 3):
-            selectedMove = moves[random.randint(0,len(moves) - 1)];
-            
-        return selectedMove
-        '''
-
-        
-        
     
     ##
     #getAttack

@@ -348,3 +348,16 @@ class AIPlayer(Player):
     def getAttack(self, currentState, attackingAnt, enemyLocations):
         #Attack a random enemy.
         return enemyLocations[random.randint(0, len(enemyLocations) - 1)]
+    
+#Tests to see if getFoodCost gives a value for an empty antList
+antList = []
+if(getFoodCost(antList) != 0):
+    print("getFoodCost is not working")
+    
+
+#testing to see if findOverallScore finds the average score
+node1 = Node(0,0,0,0.5)
+node2 = Node(0,0,0,0.7)
+nodeList = (node1, node2)
+if(findOverallScore(nodeList) != 0.6):
+    print("findOverallScore does not work")    
